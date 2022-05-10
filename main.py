@@ -139,7 +139,7 @@ class CheatSheet:
             cs_dict[tab_name] = children
         
         with open(self.fp, 'w', encoding='utf-8') as cheatsheet:
-            json.dump(cs_dict, cheatsheet)
+            json.dump(cs_dict, cheatsheet, indent=4)
     
     def save(f):
         def inner(self, *args, **kwargs):
@@ -206,20 +206,24 @@ class CheatSheet:
         s.configure('LeftAlign.TButton', anchor='w')        
         
         button = ttk.Button(tab_frame.viewPort,
-                            text=description,
                             style='LeftAlign.TButton',
                             command=lambda: self.button_command(button_id))#pyperclip.copy(code_string))
-        self.buttons[button_id] = Button(description, code_string, button)
+
+        description_var = tk.StringVar(button, value=description, name=f'{button_id} description')
+        codestring_var = tk.StringVar(button, value=code_string, name=f'{button_id} codestring')
+
+        button.config(textvariable=description_var)
+
+        self.buttons[button_id] = Button(description_var, codestring_var, button)
             
         return button_id
             
     
     def button_command(self, button_id):
         if self.edit_mode:
-            print("Implement this!")
-            #self.edit_button_popup(button_id)
+            self.edit_button_popup(button_id)
         else:
-            pyperclip.copy(self.buttons[button_id].codestring)
+            pyperclip.copy(self.buttons[button_id].codestring.get())
 
 
     def add_item_popup(self):
@@ -250,6 +254,33 @@ class CheatSheet:
     def edit_items(self):
         # Do something to show its in edit mode
         self.edit_mode = not self.edit_mode
+
+    def edit_button_popup(self, button_id):
+        editItemPopup = EntryPopup(self.window)
+        desc_var = editItemPopup.add_entry("New Description")
+        code_string_widget = editItemPopup.add_text("New Code String")
+
+        # submit button
+        def submit_action():
+            tab_name = self.tabControl.tab(self.tabControl.select(), "text")
+            self.edit_button(desc_var.get(),
+                             code_string_widget.get("1.0",'end-1c'))
+            editItemPopup.destroy()
+
+        def delete_action(button_id):
+            current_tab = self.tabControl.tab(self.tabControl.select(), "text")
+            confirmation = messagebox.askyesno(title="Delete Tab", message=f"Are you sure you want to delete button '{current_tab}'?")
+            if confirmation:
+                editItemPopup.destroy()
+
+
+        editItemPopup.add_buttons({"Submit": submit_action,
+                                    "Delete": lambda: delete_action(button_id),
+                                    "Cancel": editItemPopup.destroy})
+        editItemPopup.size_popup()
+
+    def edit_button(self, *new_info):
+        pass
 
 
     def create_tab_popup(self):
@@ -328,7 +359,7 @@ if __name__ == '__main__':
         #app.save_cheatsheet()
         window.withdraw()
         image=Image.open("favicon.ico")
-        menu=(item('Quit', quit_window), item('Show', show_window))
+        menu=(item('Show', show_window), item('Quit', quit_window))
         icon=pystray.Icon("name", image, "My System Tray Icon", menu)
         icon.run()
         
