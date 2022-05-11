@@ -78,17 +78,34 @@ class CheatSheet:
     def __init__(self, window):
         self._id_count = 0
         self.edit_mode = False
-        
-        # Set the size of the window
+
+        self.onTop = True
         window.geometry("350x350-50-50")
-        window.resizable(False, True)        
+        window.resizable(False, True)
+        window.title("CheatSheet")
+        window.protocol('WM_DELETE_WINDOW', self.hide_window)
+        window.attributes("-topmost", self.onTop)
+        window.option_add('*tearOff', False)
+        self.window = window
 
         self.fp = "cheatsheet.json"
         photo = tk.PhotoImage(file="MyTrashcan15.png")
         self.trashcan = photo.subsample(1, 1)          
 
-        self.window = window
-        window.title("CheatSheet")
+        menu = tk.Menu(window)
+        window.config(menu=menu)
+
+        optionsMenu = tk.Menu(menu)
+        menu.add_cascade(label="Options", menu=optionsMenu)
+        optionsMenu.add_command(label="Always on top", command=self.toggle_on_top)
+        optionsMenu.add_command(label="Exit", command=window.destroy)
+
+        profileMenu = tk.Menu(menu)
+        menu.add_cascade(label="Profile", menu=profileMenu)
+        profileMenu.add_command(label="New", command=None)
+        profileMenu.add_command(label="Select", command=self.select_profile)
+        profileMenu.add_command(label="Save as", command=None)
+        profileMenu.add_command(label="Rename", command=None)
         
         self.tabs = {}
         self.buttons = {}
@@ -115,9 +132,35 @@ class CheatSheet:
         deleteTabButton = ttk.Button(buttonRow,
                                      text='Delete Tab',
                                      command=self.delete_tab_popup)
-        deleteTabButton.pack(expand=True, fill='y', side="left", padx=5, pady=5)   
-            
-    
+        deleteTabButton.pack(expand=True, fill='y', side="left", padx=5, pady=5)
+
+    def toggle_on_top(self):
+        self.onTop = not self.onTop
+        window.attributes("-topmost", self.onTop)
+
+    def select_profile(self):
+        pass
+
+    @staticmethod
+    def quit_window(icon, item):
+        # Define a function for quit the window
+        icon.stop()
+        window.destroy()
+
+    @staticmethod
+    def show_window(icon, item):
+        # Define a function to show the window again
+        icon.stop()
+        window.after(0, window.deiconify())
+
+    def hide_window(self):
+        # Hide the window and show on the system taskbar
+        self.window.withdraw()
+        image = Image.open("favicon.ico")
+        menu = (item('Show', self.show_window), item('Quit', self.quit_window))
+        icon = pystray.Icon("name", image, "My System Tray Icon", menu)
+        icon.run()
+
     def load_cheatsheet(self):
         """Retrieve cheatsheet info from json file."""
         if not os.path.isfile(self.fp):
@@ -382,27 +425,5 @@ if __name__ == '__main__':
     window = tk.Tk()
 
     app = CheatSheet(window)
-
-    # Define a function for quit the window
-    def quit_window(icon, item):
-        icon.stop()
-        window.destroy()
-
-    # Define a function to show the window again
-    def show_window(icon, item):
-        icon.stop()
-        window.after(0, window.deiconify())
-    
-    # Hide the window and show on the system taskbar
-    def hide_window():
-        #app.save_cheatsheet()
-        window.withdraw()
-        image=Image.open("favicon.ico")
-        menu=(item('Show', show_window), item('Quit', quit_window))
-        icon=pystray.Icon("name", image, "My System Tray Icon", menu)
-        icon.run()
-        
-    window.protocol('WM_DELETE_WINDOW', hide_window)
-    window.attributes("-topmost", True)
         
     window.mainloop()
