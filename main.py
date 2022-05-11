@@ -55,10 +55,12 @@ class EntryPopup():
         return text_entry
     
     def add_buttons(self, button_info):
-        
+        buttons = {}
         for name, command in button_info.items():
-            submit_button = ttk.Button(self.button_container, text=name, command=command)
-            submit_button.pack(side='left', expand=True)
+            button = ttk.Button(self.button_container, text=name, command=command)
+            button.pack(side='left', expand=True)
+            buttons[name] = button
+        return buttons
         
         
     def size_popup(self):
@@ -82,6 +84,8 @@ class CheatSheet:
         window.resizable(False, True)        
 
         self.fp = "cheatsheet.json"
+        photo = tk.PhotoImage(file="MyTrashcan15.png")
+        self.trashcan = photo.subsample(1, 1)          
 
         self.window = window
         window.title("CheatSheet")
@@ -133,8 +137,8 @@ class CheatSheet:
             children = []
             for button_id in tab_info.children:
                 button_info = self.buttons[button_id]
-                children.append([button_info.description,
-                                 button_info.codestring])
+                children.append([button_info.description.get(),
+                                 button_info.codestring.get()])
                 
             cs_dict[tab_name] = children
         
@@ -155,8 +159,16 @@ class CheatSheet:
             
             for tab_info in self.tabs.values():
                 for button_id in tab_info.children:
-                    button = self.buttons[button_id].widget
-                    button.pack(fill='x', side='top', padx=10, pady=5)   
+                    try:
+                        button = self.buttons[button_id].widget
+                    except KeyError:
+                        continue
+                    button.pack(fill='x', side='top', padx=10, pady=5)
+
+                    #delete_button = ttk.Button(tab_info.widget,
+                                               #image=photo,
+                                               #command=None)
+                    #button.pack(fill='x', side='top', padx=10, pady=5)
                 
         return inner
 
@@ -250,10 +262,20 @@ class CheatSheet:
         button_id = self.generate_button(desc, code_string, self.tabs[tab_name].widget)
         self.tabs[tab_name].children.append(button_id)
         
-        
+    @reload_gui
     def edit_items(self):
         # Do something to show its in edit mode
         self.edit_mode = not self.edit_mode
+        options = {
+            True: {'image': self.trashcan, 'compound': 'right'},
+            False: {'image': ''}
+        }
+        SPACE_WIDTH = 3
+        for button_id, button_info in self.buttons.items():
+            spaces_needed = int(self.window.winfo_width() / SPACE_WIDTH)
+            button_info.description.set(button_info.description.get() + ' ' * spaces_needed)
+            
+            button_info.widget.configure(**options[self.edit_mode])
 
     def edit_button_popup(self, button_id):
         editItemPopup = EntryPopup(self.window)
@@ -263,24 +285,41 @@ class CheatSheet:
         # submit button
         def submit_action():
             tab_name = self.tabControl.tab(self.tabControl.select(), "text")
-            self.edit_button(desc_var.get(),
+            self.edit_button(button_id,
+                             desc_var.get(),
                              code_string_widget.get("1.0",'end-1c'))
             editItemPopup.destroy()
 
-        def delete_action(button_id):
+        def delete_action():
             current_tab = self.tabControl.tab(self.tabControl.select(), "text")
             confirmation = messagebox.askyesno(title="Delete Tab", message=f"Are you sure you want to delete button '{current_tab}'?")
             if confirmation:
+                self.delete_button(button_id)
                 editItemPopup.destroy()
 
 
-        editItemPopup.add_buttons({"Submit": submit_action,
-                                    "Delete": lambda: delete_action(button_id),
-                                    "Cancel": editItemPopup.destroy})
+        buttons = editItemPopup.add_buttons({"Submit": submit_action,
+                                             "Delete": delete_action,
+                                             "Cancel": editItemPopup.destroy})
+        buttons["Submit"].focus_set()
         editItemPopup.size_popup()
 
-    def edit_button(self, *new_info):
-        pass
+    @save
+    def edit_button(self, button_id, new_description, new_codestring):
+        button_info = self.buttons[button_id]
+        if new_description:
+            button_info.description.set(new_description)
+        if new_codestring:
+            button_info.codestring.set(new_codestring)
+
+    @save
+    @reload_gui            
+    def delete_button(self, button_id):
+        button = self.buttons[button_id].widget
+        current_tab_name = self.tabControl.tab(button.master.master.master, "text") 
+        button.destroy()
+        self.tabs[current_tab_name].children.remove(button_id)
+        del self.buttons[button_id]
 
 
     def create_tab_popup(self):
