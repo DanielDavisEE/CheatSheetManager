@@ -28,17 +28,17 @@ class EntryPopup():
         self.button_container = ttk.Frame(self.popupWindow)
         self.button_container.pack(side='top', fill='x', padx=20, pady=5)            
         
-    def add_entry(self, label):
+    def add_entry(self, label, default=''):
         label_widget = ttk.Label(self.input_container, text=label)
         label_widget.pack(side='top', fill='x', expand=False)
         
-        entry_contents = tk.StringVar(self.popupWindow)
+        entry_contents = tk.StringVar(self.popupWindow, value=default)
         text_entry = ttk.Entry(self.input_container, textvariable=entry_contents)
         text_entry.pack(side='top', fill='both', expand=False)
         
         return entry_contents
     
-    def add_text(self, label):
+    def add_text(self, label, default=''):
         label_widget = ttk.Label(self.input_container, text=label)
         label_widget.pack(side='top', fill='x', expand=False) 
         
@@ -46,6 +46,7 @@ class EntryPopup():
         text_entry_frame.pack(side='top', fill='both', expand=True)  
         
         text_entry = tk.Text(text_entry_frame, height=1, width=1)
+        text_entry.insert(1.0, default)
         text_entry.pack(side='left', fill='both', expand=True)   
         
         scrollbar = ttk.Scrollbar(text_entry_frame, orient='vertical', command=text_entry.yview)
@@ -321,9 +322,11 @@ class CheatSheet:
             button_info.widget.configure(**options[self.edit_mode])
 
     def edit_button_popup(self, button_id):
+        button_info = self.buttons[button_id]
+
         editItemPopup = EntryPopup(self.window)
-        desc_var = editItemPopup.add_entry("New Description")
-        code_string_widget = editItemPopup.add_text("New Code String")
+        desc_var = editItemPopup.add_entry("Change Description", button_info.description.get())
+        code_string_widget = editItemPopup.add_text("Change Code String", button_info.codestring.get())
 
         # submit button
         def submit_action():
