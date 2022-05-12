@@ -107,6 +107,7 @@ class CheatSheet:
         profileMenu.add_command(label="Select", command=self.select_profile)
         profileMenu.add_command(label="Save as", command=None)
         profileMenu.add_command(label="Rename", command=None)
+        profileMenu.add_command(label="Backup", command=None)
         
         self.tabs = {}
         self.buttons = {}
