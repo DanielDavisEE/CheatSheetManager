@@ -396,7 +396,9 @@ class CheatSheet:
     
     @save
     def delete_tab(self, tab_name):
-        self.tabs[tab_name].destroy()
+        self.tabs[tab_name].widget.destroy()
+        for button_id in self.tabs[tab_name].children:
+            self.delete_button(button_id)
         del self.tabs[tab_name]
         
         
