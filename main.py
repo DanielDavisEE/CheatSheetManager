@@ -1,9 +1,9 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter.filedialog import askopenfilename, asksaveasfilename
+from tkinter.filedialog import askopenfilename, asksaveasfilename, askdirectory
 from tkinter import messagebox
 
-import os, json, pyperclip
+import os, shutil, json, pyperclip
 
 from pystray import MenuItem as item
 import pystray
@@ -19,6 +19,7 @@ class EntryPopup():
     
     def __init__(self, window):
         self.popupWindow = tk.Toplevel(window)
+        self.popupWindow.grab_set()
         
         # Frame for main body
         self.input_container = ttk.Frame(self.popupWindow)
@@ -55,6 +56,21 @@ class EntryPopup():
         
         return text_entry
     
+    def add_combobox(self, label, values, state='readonly', default=None):
+        label_widget = ttk.Label(self.input_container, text=label)
+        label_widget.pack(side='top', fill='x', expand=False)
+        
+        if default is None:
+            default = values[0]
+        selected_item = tk.StringVar(self.popupWindow, value=default)
+        text_entry = ttk.Combobox(self.input_container,
+                                  values=values,
+                                  textvariable=selected_item,
+                                  state=state)
+        text_entry.pack(side='top', fill='both', expand=False)
+        
+        return selected_item         
+    
     def add_buttons(self, button_info):
         buttons = {}
         for name, command in button_info.items():
@@ -89,7 +105,8 @@ class CheatSheet:
         window.option_add('*tearOff', False)
         self.window = window
 
-        self.fp = "cheatsheet.json"
+        self.profile_folder = os.path.join(os.getcwd(), "profiles")
+        self.profile = 'default'
         photo = tk.PhotoImage(file="MyTrashcan15.png")
         self.trashcan = photo.subsample(1, 1)          
 
@@ -103,45 +120,118 @@ class CheatSheet:
 
         profileMenu = tk.Menu(menu)
         menu.add_cascade(label="Profile", menu=profileMenu)
-        profileMenu.add_command(label="New", command=None)
+        profileMenu.add_command(label="New",    command=self.create_profile)
         profileMenu.add_command(label="Select", command=self.select_profile)
-        profileMenu.add_command(label="Save as", command=None)
-        profileMenu.add_command(label="Rename", command=None)
-        profileMenu.add_command(label="Backup", command=None)
+        profileMenu.add_command(label="Rename", command=self.rename_profile)
+        profileMenu.add_command(label="Import", command=self.import_profile)
+        profileMenu.add_command(label="Export", command=self.export_profile)
         
         self.tabs = {}
         self.buttons = {}
-        self.generate_gui()
+        cs_dict = self.load_cheatsheet()        
+        self.generate_gui(cs_dict)
 
         buttonRow = ttk.Frame(window)
         buttonRow.pack(expand=False, fill="x", side="bottom")
-
-        addItemButton = ttk.Button(buttonRow,
-                                   text='Add Item',
-                                   command=self.add_item_popup)
-        addItemButton.pack(expand=True, fill='y', side="left", padx=5, pady=5)
-
-        editItemButton = ttk.Button(buttonRow,
-                                    text='Edit Items',
-                                    command=self.edit_items)
-        editItemButton.pack(expand=True, fill='y', side="left", padx=5, pady=5)   
-
-        addTabButton = ttk.Button(buttonRow,
-                                  text='Add Tab',
-                                  command=self.create_tab_popup)
-        addTabButton.pack(expand=True, fill='y', side="left", padx=5, pady=5)   
-
-        deleteTabButton = ttk.Button(buttonRow,
-                                     text='Delete Tab',
-                                     command=self.delete_tab_popup)
-        deleteTabButton.pack(expand=True, fill='y', side="left", padx=5, pady=5)
+        
+        buttons = [('Add Item', self.add_item_popup),
+                   ('Edit Items', self.edit_items),
+                   ('Add Tab', self.create_tab_popup),
+                   ('Delete Tab', self.delete_tab_popup),
+                   ]
+        
+        for name, command in buttons:
+            button = ttk.Button(buttonRow,
+                                text=name,
+                                command=command)
+            button.pack(expand=True, fill='y', side="left", padx=5, pady=5)
 
     def toggle_on_top(self):
         self.onTop = not self.onTop
         window.attributes("-topmost", self.onTop)
 
+    def create_profile(self):
+        createProfilePopup = EntryPopup(self.window)
+        tab_name_var = createProfilePopup.add_entry("New Profile Name")
+        
+        # submit button
+        def submit_action():
+            profile = tab_name_var.get()
+            fp = os.path.join(self.profile_folder, profile + '.json')
+            if not os.path.isfile(fp):
+                self.profile = profile
+                cs_dict = self.load_cheatsheet()
+                self.generate_gui(cs_dict)        
+            else:
+                messagebox.showerror(title="Invalid Name", message=f"Profile '{profile}' already exists.")
+                
+            createProfilePopup.destroy()        
+        
+        createProfilePopup.add_buttons({"Submit": submit_action,
+                                        "Cancel": createProfilePopup.destroy})
+        createProfilePopup.size_popup()
+
     def select_profile(self):
-        pass
+        selectProfilePopup = EntryPopup(self.window)
+        values = [os.path.splitext(x)[0] for x in os.listdir(self.profile_folder)]
+        profile_name_var = selectProfilePopup.add_combobox("Select Profile", values, default=self.profile)
+        
+        def submit_action():
+            self.profile = profile_name_var.get()
+            cs_dict = self.load_cheatsheet()
+            self.generate_gui(cs_dict)
+                
+            selectProfilePopup.destroy()        
+        
+        selectProfilePopup.add_buttons({"Submit": submit_action,
+                                        "Cancel": selectProfilePopup.destroy})
+        selectProfilePopup.size_popup()
+
+    def rename_profile(self):
+        renameProfilePopup = EntryPopup(self.window)
+        tab_name_var = renameProfilePopup.add_entry(f"Change '{self.profile}' to")
+        
+        # submit button
+        def submit_action():
+            profile_name = tab_name_var.get()
+            
+            old_name = os.path.join(self.profile_folder, self.profile + '.json')
+            new_name = os.path.join(self.profile_folder, profile_name + '.json')
+            
+            try:
+                os.rename(old_name, new_name)
+            except FileExistsError:
+                messagebox.showerror(title="Invalid Name", message=f"Profile '{profile_name}' already exists.")
+                
+            self.profile = profile_name
+            renameProfilePopup.destroy()      
+        
+        renameProfilePopup.add_buttons({"Submit": submit_action,
+                                        "Cancel": renameProfilePopup.destroy})
+        renameProfilePopup.size_popup()
+
+    def import_profile(self):
+        profile_fp = askopenfilename(filetypes=[('JSON', '*.json')], defaultextension='.json' )
+        if not profile_fp:
+            return
+        
+        filename = os.path.basename(profile_fp)
+        profile_name, ext = os.path.splitext(filename)
+        self.profile = profile_name
+        
+        try:
+            shutil.copy(profile_fp, self.profile_folder)
+        except shutil.SameFileError:
+            messagebox.showerror(title="Invalid Name", message=f"Profile '{profile_name}' already exists. Rename file and try again.")
+        else:            
+            cs_dict = self.load_cheatsheet()
+            self.generate_gui(cs_dict)
+
+    def export_profile(self):
+        profile_fp = askdirectory()
+        if not profile_fp:
+            return
+        self.save_cheatsheet(path=profile_fp)
 
     @staticmethod
     def quit_window(icon, item):
@@ -163,20 +253,31 @@ class CheatSheet:
         icon = pystray.Icon("name", image, "My System Tray Icon", menu)
         icon.run()
 
-    def load_cheatsheet(self):
+    def load_cheatsheet(self, profile=None):
         """Retrieve cheatsheet info from json file."""
-        if not os.path.isfile(self.fp):
-            with open(self.fp, "w", encoding="utf-8") as cheatsheet:
+        if profile is None:
+            profile = self.profile
+        fp = os.path.join(self.profile_folder, profile + '.json')
+            
+        if not os.path.isfile(fp):
+            with open(fp, "w", encoding="utf-8") as cheatsheet:
                 json.dump({"Tab 1": []}, cheatsheet)
 
-        with open(self.fp, encoding="utf-8") as cheatsheet:
+        with open(fp, encoding="utf-8") as cheatsheet:
             cs_dict = json.load(cheatsheet)
             if not cs_dict:
                 cs_dict = {"Tab 1": []}
         
         return cs_dict
     
-    def save_cheatsheet(self):
+    def save_cheatsheet(self, profile=None, path=None):
+        if profile is None:
+            profile = self.profile
+        if path is None:
+            path = self.profile_folder
+        fp = os.path.join(path, profile + '.json')
+            
+        
         cs_dict = {}
         for tab_name, tab_info in self.tabs.items():
             children = []
@@ -187,7 +288,7 @@ class CheatSheet:
                 
             cs_dict[tab_name] = children
         
-        with open(self.fp, 'w', encoding='utf-8') as cheatsheet:
+        with open(fp, 'w', encoding='utf-8') as cheatsheet:
             json.dump(cs_dict, cheatsheet, indent=4)
     
     def save(f):
@@ -209,11 +310,6 @@ class CheatSheet:
                     except KeyError:
                         continue
                     button.pack(fill='x', side='top', padx=10, pady=5)
-
-                    #delete_button = ttk.Button(tab_info.widget,
-                                               #image=photo,
-                                               #command=None)
-                    #button.pack(fill='x', side='top', padx=10, pady=5)
                 
         return inner
 
@@ -228,10 +324,13 @@ class CheatSheet:
         return inner
 
     @reload_gui
-    def generate_gui(self):
-        cs_dict = self.load_cheatsheet()
+    def generate_gui(self, cs_dict):
+        try:
+            self.tabControl.destroy()
+        except:
+            pass
         
-        tabControl = ttk.Notebook(window)
+        tabControl = ttk.Notebook(self.window)
         tabControl.bind('<Double-Button-1>', self.edit_tab_popup)
         tabControl.pack(expand=1, fill="both")   
         
@@ -386,6 +485,7 @@ class CheatSheet:
     def create_tab(self, tab_name):
         """Add a tab to the json dict and save it."""            
         self.generate_tab(tab_name)
+        self.tabControl.select(self.tabs[tab_name].widget)
             
     
     def delete_tab_popup(self):
