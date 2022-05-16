@@ -10,10 +10,94 @@ import pystray
 from PIL import Image, ImageTk
 
 from VerticalScrollFrame import ScrollFrame
+#import DragAndDrop
 from collections import namedtuple
 
 Tab = namedtuple("Tab", ["children", "widget"])
 Button = namedtuple("Button", ["description", "codestring", "widget"])
+
+
+class DraggableButton(ttk.Button):
+    """This class is unused, and in development for a future feature."""
+    
+    @property
+    def description(self):
+        return self._description_var.get()
+    
+    @description.setter
+    def description(self, description):
+        return self._description_var.set(description)
+    
+    @property
+    def codestring(self):
+        return self._codestring_var.get()
+    
+    @codestring.setter
+    def codestring(self, codestring):
+        return self._codestring_var.set(codestring)
+
+    def __init__(self, *args, description=None, codestring=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self._description_var = tk.StringVar(self, value=description, name=f'{button_id} description')
+        self._codestring_var = tk.StringVar(self, value=code_string, name=f'{button_id} codestring')
+        
+        self.canvas = self.label = self.id = None
+
+    def attach(self, canvas, x=10, y=10):
+        if canvas is self.canvas:
+            self.canvas.coords(self.id, x, y)
+            return
+        if self.canvas:
+            self.detach()
+        if not canvas:
+            return
+        label = tkinter.Button(canvas, text=self.name, command=lambda: print(self.name),
+                               borderwidth=2, relief="raised")
+        id = canvas.create_window(x, y, window=label, anchor="nw")
+        self.canvas = canvas
+        self.label = label
+        self.id = id
+        label.bind("<ButtonPress>", self.press)
+
+    def detach(self):
+        canvas = self.canvas
+        if not canvas:
+            return
+        id = self.id
+        label = self.label
+        self.canvas = self.label = self.id = None
+        canvas.delete(id)
+        label.destroy()
+
+    def press(self, event):
+        if dnd_start(self, event):
+            # where the pointer is relative to the label widget:
+            self.x_off = event.x
+            self.y_off = event.y
+            # where the widget is relative to the canvas:
+            self.x_orig, self.y_orig = self.canvas.coords(self.id)
+
+    def move(self, event):
+        x, y = self.where(self.canvas, event)
+        self.canvas.coords(self.id, x, y)
+
+    def putback(self):
+        self.canvas.coords(self.id, self.x_orig, self.y_orig)
+
+    def where(self, canvas, event):
+        # where the corner of the canvas is relative to the screen:
+        x_org = canvas.winfo_rootx()
+        y_org = canvas.winfo_rooty()
+        # where the pointer is relative to the canvas widget:
+        x = event.x_root - x_org
+        y = event.y_root - y_org
+        # compensate for initial pointer offset
+        return x - self.x_off, y - self.y_off
+
+    def dnd_end(self, target, event):
+        pass
+
 
 class EntryPopup():
     
@@ -299,7 +383,7 @@ class CheatSheet:
                 
         return inner
     
-    def reload_gui(f):
+    def refresh_buttons(f):
         def inner(self, *args, **kwargs):
             f(self, *args, **kwargs)
             
@@ -323,7 +407,7 @@ class CheatSheet:
             f(self, tab_name, *args, **kwargs)
         return inner
 
-    @reload_gui
+    @refresh_buttons
     def generate_gui(self, cs_dict):
         try:
             self.tabControl.destroy()
@@ -399,14 +483,14 @@ class CheatSheet:
         addItemPopup.size_popup()
 
     @save
-    @reload_gui
+    @refresh_buttons
     def add_item(self, desc, code_string, tab_name):
         """Add item to json dict and save it."""
         
         button_id = self.generate_button(desc, code_string, self.tabs[tab_name].widget)
         self.tabs[tab_name].children.append(button_id)
         
-    @reload_gui
+    @refresh_buttons
     def edit_items(self):
         # Do something to show its in edit mode
         self.edit_mode = not self.edit_mode
@@ -459,7 +543,7 @@ class CheatSheet:
             button_info.codestring.set(new_codestring)
 
     @save
-    @reload_gui            
+    @refresh_buttons            
     def delete_button(self, button_id):
         button = self.buttons[button_id].widget
         current_tab_name = self.tabControl.tab(button.master.master.master, "text") 
@@ -524,6 +608,11 @@ class CheatSheet:
         
         tab_frame = self.tabs[new_tab_name].widget
         self.tabControl.tab(tab_frame, text=new_tab_name)
+        
+    
+    """ ----------------- BUTTON MOVEMENT----------------- """
+    
+    # Place holder for future development
 
 
 
