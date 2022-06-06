@@ -501,7 +501,8 @@ class CheatSheet:
         SPACE_WIDTH = 3
         for button_id, button_info in self.buttons.items():
             spaces_needed = int(self.window.winfo_width() / SPACE_WIDTH)
-            button_info.description.set(button_info.description.get() + ' ' * spaces_needed)
+            button_info.description.set(button_info.description.get().strip()
+                                        + ' ' * spaces_needed * self.edit_mode)
             
             button_info.widget.configure(**options[self.edit_mode])
 
@@ -509,7 +510,7 @@ class CheatSheet:
         button_info = self.buttons[button_id]
 
         editItemPopup = EntryPopup(self.window)
-        desc_var = editItemPopup.add_entry("Change Description", button_info.description.get())
+        desc_var = editItemPopup.add_entry("Change Description", button_info.description.get().strip())
         code_string_widget = editItemPopup.add_text("Change Code String", button_info.codestring.get())
 
         # submit button
@@ -521,8 +522,8 @@ class CheatSheet:
             editItemPopup.destroy()
 
         def delete_action():
-            current_tab = self.tabControl.tab(self.tabControl.select(), "text")
-            confirmation = messagebox.askyesno(title="Delete Tab", message=f"Are you sure you want to delete button '{current_tab}'?")
+            button_text = desc_var.get()
+            confirmation = messagebox.askyesno(title="Delete Button", message=f"Are you sure you want to delete button '{button_text}'?")
             if confirmation:
                 self.delete_button(button_id)
                 editItemPopup.destroy()
@@ -537,8 +538,11 @@ class CheatSheet:
     @save
     def edit_button(self, button_id, new_description, new_codestring):
         button_info = self.buttons[button_id]
+        SPACE_WIDTH = 3
         if new_description:
-            button_info.description.set(new_description)
+            spaces_needed = int(self.window.winfo_width() / SPACE_WIDTH)            
+            button_info.description.set(new_description.strip()
+                                        + ' ' * spaces_needed * self.edit_mode)
         if new_codestring:
             button_info.codestring.set(new_codestring)
 
